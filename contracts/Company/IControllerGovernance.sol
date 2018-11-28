@@ -32,7 +32,8 @@ contract IControllerGovernance is
         ChangeTokenController, // (new token controller)
         AmendISHA, // for example off-chain investment (agreement url, new number of shares, new shareholder rights, new valuation eur)
         IssueTokensForExistingShares, // (number of converted shares, allocation (address => balance))
-        ChangeNominee
+        ChangeNominee,
+        Downround // results in issuance of new equity token and disbursing it to current token holders
     }
 
     ////////////////////////
@@ -132,8 +133,16 @@ contract IControllerGovernance is
         constant
         returns (
             address[] equityTokens,
-            uint256[] shares,
-            address[] lastOfferings
+            uint256[] shares
+        );
+
+    // returns all started offerings
+    function tokenOfferings()
+        public
+        constant
+        returns (
+            address[] offerings,
+            address[] equityTokens
         );
 
     // officially inform shareholders, can be quarterly report, yearly closing

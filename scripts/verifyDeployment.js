@@ -62,6 +62,7 @@ module.exports = async function inspectETO() {
   }
 
   const config = getConfig(web3, options.network, []);
+  console.log(config);
 
   // get artifacts
   const Universe = artifacts.require(config.artifacts.UNIVERSE);
@@ -156,6 +157,7 @@ module.exports = async function inspectETO() {
   );
   // check if PLATFORM_OPERATOR_WALLET is Verified
   const identityRegistry = await IdentityRegistry.at(await universe.identityRegistry());
+  console.log(`Platform Operator wallet is ${config.addresses.PLATFORM_OPERATOR_WALLET}`);
   const powClaims = await identityRegistry.getClaims(config.addresses.PLATFORM_OPERATOR_WALLET);
   const powDeserializedClaims = deserializeClaims(powClaims);
   const powIsVerified = Object.assign(...powDeserializedClaims).isVerified;

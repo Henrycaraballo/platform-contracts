@@ -68,13 +68,13 @@ contract PlaceholderEquityTokenController is
     ////////////////////////
 
     // require caller is ETO in universe
-    modifier onlyRegisteredETO() {
+    modifier onlyUniverseETO() {
         require(UNIVERSE.isInterfaceCollectionInstance(KNOWN_INTERFACE_COMMITMENT, msg.sender), "NF_ETC_ETO_NOT_U");
         _;
     }
 
     modifier onlyCompany() {
-        require(msg.sender == COMPANY_LEGAL_REPRESENTATIVE, "ONLY_COMPANY");
+        require(msg.sender == COMPANY_LEGAL_REPRESENTATIVE, "NF_ONLY_COMPANY");
         _;
     }
 
@@ -149,8 +149,7 @@ contract PlaceholderEquityTokenController is
         constant
         returns (
             address[] equityTokens,
-            uint256[] shares,
-            address[] lastOfferings
+            uint256[] shares
         )
     {
         // no cap table before ETO completed
@@ -159,11 +158,28 @@ contract PlaceholderEquityTokenController is
         }
         equityTokens = new address[](1);
         shares = new uint256[](1);
-        lastOfferings = new address[](1);
 
         equityTokens[0] = _equityToken;
-        lastOfferings[0] = _commitment;
         shares[0] = _equityToken.sharesTotalSupply();
+    }
+
+    function tokenOfferings()
+        public
+        constant
+        returns (
+            address[] offerings,
+            address[] equityTokens
+        )
+    {
+        // no offerings in setup mode
+        if (_state == GovState.Setup) {
+            return;
+        }
+        offerings = new address[](1);
+        equityTokens = new address[](1);
+
+        equityTokens[0] = _equityToken;
+        offerings[0] = _commitment;
     }
 
     function issueGeneralInformation(
@@ -184,7 +200,7 @@ contract PlaceholderEquityTokenController is
         onlyCompany
         returns (bytes32 /*resolutionId*/)
     {
-        revert();
+        revert("NF_NOT_IMPL");
     }
 
 
@@ -192,21 +208,21 @@ contract PlaceholderEquityTokenController is
         public
         onlyOperational
     {
-        revert();
+        revert("NF_NOT_IMPL");
     }
 
     function closeCompany()
         public
         onlyState(GovState.Closing)
     {
-        revert();
+        revert("NF_NOT_IMPL");
     }
 
     function cancelCompanyClosing()
         public
         onlyState(GovState.Closing)
     {
-        revert();
+        revert("NF_NOT_IMPL");
     }
 
     function changeTokenController(address newController)
@@ -313,7 +329,7 @@ contract PlaceholderEquityTokenController is
     function tokenFallback(address, uint256, bytes)
         public
     {
-        revert("NOT_IMPL");
+        revert("NF_NOT_IMPL");
     }
 
     //
@@ -329,7 +345,7 @@ contract PlaceholderEquityTokenController is
 
     function onStateTransition(ETOState, ETOState newState)
         public
-        onlyRegisteredETO
+        onlyUniverseETO
     {
         if (newState == ETOState.Whitelist) {
             require(_state == GovState.Setup, "NF_ETC_BAD_STATE");
@@ -396,7 +412,7 @@ contract PlaceholderEquityTokenController is
         if (_transfersEnabled != transfersEnabled) {
             _transfersEnabled = transfersEnabled;
         }
-        emit LogResolutionExecuted(0, transfersEnabled ? Action.StopToken : Action.ContinueToken);
+        emit LogResolutionExecuted(0, transfersEnabled ? Action.ContinueToken : Action.StopToken);
         emit LogTransfersStateChanged(0, _equityToken, transfersEnabled);
     }
 
@@ -445,17 +461,19 @@ contract PlaceholderEquityTokenController is
     function aproveTokenOfferingPrivate(IETOCommitment tokenOffering)
         private
     {
+        // execute pending resolutions on completed ETO
         (uint256 newShares,,,,,,,) = tokenOffering.contributionSummary();
         uint256 totalShares = tokenOffering.etoTerms().EXISTING_COMPANY_SHARES() + newShares;
-        uint256 marginalPrice = tokenOffering.etoTerms().TOKEN_TERMS().TOKEN_PRICE_EUR_ULPS();
+        uint256 marginalTokenPrice = tokenOffering.etoTerms().TOKEN_TERMS().TOKEN_PRICE_EUR_ULPS();
         string memory ISHAUrl = tokenOffering.signedInvestmentAgreementUrl();
+        // set new ISHA, increase number of shares, company valuations and establish shareholder rights matrix
         amendISHA(
             ISHAUrl,
             totalShares,
-            totalShares * marginalPrice,
+            totalShares * marginalTokenPrice * tokenOffering.etoTerms().TOKEN_TERMS().EQUITY_TOKENS_PER_SHARE(),
             tokenOffering.etoTerms().SHAREHOLDER_RIGHTS()
         );
-        // execute shareholder rights
+        // enable/disable transfers per ETO Terms
         enableTransfers(tokenOffering.etoTerms().ENABLE_TRANSFERS_ON_SUCCESS());
         // move state to funded
         transitionTo(GovState.Funded);
